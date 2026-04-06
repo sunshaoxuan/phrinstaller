@@ -7,7 +7,9 @@
 
 ## 1. 概述 (Objective)
 
-为庶务事务（OHR）系统提供一个基于 PowerShell 7+ 的自动化安装工具。该工具旨在通过标准化流程，在 On-Premise 环境中完成从“原始资材配置”到“全自动化部署”的闭环，显著降低人工干预风险。
+为庶务事务（OHR）系统提供一个基于 PowerShell 7+ 的自动化安装工具。该工具旨在通过标准化流程，将任务解耦为 **环境配置** (Configuration) 与 **部署执行** (Installation) 两大模块：
+- **配置阶段**: 根据输入参数，从原始资材生成并保存专属的客户环境安装包。
+- **执行阶段**: 将生成的安装包应用至服务器，完成数据库初始化、服务启动及状态验证。
 
 ## 2. 工具目录结构 (Tool Directory structure)
 
@@ -59,27 +61,34 @@ OHR_Installer/
 
 ## 4. 执行流程与关键逻辑 (Execution Logic)
 
-### 4.1 核心步骤（线性连续）
+### 4.1 Phase A: 配置安装环境 (Environmental Configuration)
+本阶段负责通过交互式菜单或参数收集客户现场信息，并生成离线可执行的安装子集。
+
 1. **初始化校验**:
     - 运行权限提升 (Admin Required)。
     - PowerShell 7.0+ 检查。
-    - 原始资材目录 (`ArtifactsPath`) 完整性检查（包含 install/, sql/, config.template/）。
-2. **环境预热**:
-    - 根据 Customer/Env 创建对应的 `logs/{{CustomerName}}/{{EnvName}}` 目录。
-    - 准备 `work/` 缓存空间。
-3. **配置注入 (Configurator)**:
-    - 执行“备份与覆盖检查”（见 6.3 节）。
+    - 原始资材目录 (`ArtifactsPath`) 完整性检查。
+2. **环境采集与备份**: 
+    - 两阶段交互导航（客户/环境选择）。
+    - 从历史 JSON 读取默认值。
+    - **执行业务检查**：若目标 `installer/{{CustomerName}}/{{EnvName}}/` 已有资材，执行移动备份（见 6.3 节）。
+3. **配置注入与打包 (Configurator)**:
     - 将 `config.template/` 中的所有模板文件复制到 `work/`。
     - 根据参数执行变量替换（DB 连接, MinIO Endpoint 等）。
     - 将生成的配置及完整安装包移动至 `ConfiguredArtifactsPath/{{CustomerName}}/{{EnvName}}`。
-4. **数据库与服务部署**:
-    - 支持 AP/DB 同机或分离架构（分离模式通过 WinRM 执行）。
-    - 数据库初始化（tenant/ohr 两个 DB）。
-    - 修改 `pg_hba.conf` 并校验连通性。
-    - 执行 `suite.install.ps1` 进行 AP 服务部署。
-5. **服务验证**:
-    - 启动服务 (`suite.start.ps1`)。
-    - 端口监听 (`7070`) 与 HTTP 响应（HTTP 200/302）校验。
+
+### 4.2 Phase B: 执行部署安装 (Installation Execution)
+本阶段基于已生成的安装包，对目标服务器执行物理部署。
+
+1. **数据库预埋**:
+    - 修改 `pg_hba.conf` 并测试联调。
+    - 初始化数据库（tenant 与 ohr）并执行 SQL 数据导入。
+2. **应用部署服务**:
+    - 获取配置后的资材路径。
+    - 执行 `suite.install.ps1` 完成 Windows 服务注册及挂载。
+3. **最终启动与验收**:
+    - 启动服务 (`suite.start.ps1`) 并校验状态。
+    - 执行 HTTP 级别可用性检查，生成结果测试报告。
 
 ## 5. 日志与报告要求 (Logs & Reports)
 
