@@ -19,7 +19,7 @@ OHR_Installer/
 ├── work/               # 临时文件目录 (执行中的缓存, 禁命名为 temp_*)
 ├── logs/               # 脚本日志存放处 (按 EnvName 分离)
 ├── reports/            # 结果测试报告 (JSON/HTML 格式)
-├── artifacts_store/    # 已配置好的资材保存路径 (默认)
+├── installer/          # 配置完成的安装包输出目录 (按 EnvName 分离)
 ├── config/             # 工具自身的全局配置文件
 │   └── history/        # 历史执行快照 (断点续做与默认值回填)
 └── Install-OHR.ps1     # 核心启动脚本
@@ -35,7 +35,8 @@ OHR_Installer/
 ### 3.2 资材路径配置
 - **原始资材路径 (ArtifactsPath)**: 用户提供的、未经配置的 OHR 编译包根目录。
 - **配置后保存路径 (ConfiguredArtifactsPath)**: 脚本完成参数注入（配置化）后的资材存放位置。
-    - 存储逻辑：`$ConfiguredArtifactsPath/$EnvName/release_package`。
+    - **隔离逻辑**: 为防止多环境覆盖，必须按逻辑存储为：`$ConfiguredArtifactsPath/$EnvName/`。
+    - **产出内容**: 包含已替换变量的配置文件、.bat 脚本及 OHR 安装包。
 
 ### 3.3 参数示例
 ```powershell
