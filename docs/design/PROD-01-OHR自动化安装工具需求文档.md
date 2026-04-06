@@ -20,7 +20,7 @@ OHR_Installer/
 ├── installer/          # 配置完成的安装包输出目录 (二级目录: 客户/环境)
 ├── backup/             # 资材备份目录 (二级目录: 客户/环境/时间戳)
 ├── config/             # 工具自身的全局配置文件
-│   └── history/        # 历史执行快照 (二级目录: 客户/环境.json)
+│   └── history/        # 历史执行快照 (单文件或单一层级，JSON 内部支持分层)
 └── Install-OHR.ps1     # 核心启动脚本
 ```
 
@@ -34,7 +34,7 @@ OHR_Installer/
 - **路径隔离映射**:
     - 日志: `logs/{{CustomerName}}/{{EnvName}}/`
     - 安装包: `installer/{{CustomerName}}/{{EnvName}}/`
-    - 历史配置: `config/history/{{CustomerName}}/{{EnvName}}.json`
+    - 历史配置: `config/history/snapshot.json` (或 `config/history/{{CustomerName}}.json`，内部通过 JSON 结构区分环境)
     - 备份: `backup/{{CustomerName}}/{{EnvName}}/`
 
 ### 3.2 资材路径配置
@@ -101,9 +101,9 @@ OHR_Installer/
 
 ### 6.1 参数回填机制 (Default Values)
 - **参数收集**:
-    - 在运行过程中，脚本需持久化参数至 `config/history/{{CustomerName}}/{{EnvName}}.json`。
+    - 在运行过程中，脚本需持久化参数至 `config/history/` 目录下的 JSON 文件中。建议按客户维度存储（如 `{{CustomerName}}.json`），内部通过环境名键值对实现属性分层。
 - **交互逻辑**:
-    - 下次运行时，若指定了相同的客户与环境，脚本将自动加载历史值。
+    - 下次运行时，脚本根据选定的客户从其对应的 JSON 或 全局 snapshot 中加载环境配置。
     - **环境切换**: 若 `CustomerName` 或 `EnvName` 不同，脚本将视为新目标，重新进入相应层级的配置引导。
 
 ### 6.2 断点续做逻辑 (Resume)
