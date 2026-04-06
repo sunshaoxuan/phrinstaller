@@ -1,0 +1,20 @@
+	①　PHR_DB_BACKフォルダをDBサーバーにコピーする							
+	②　フォルダにの「dbConnection_backup.config」ファイルを更新する							
+		key=Value ※下記キーが修正しないでください※						
+		DBUSER=postgres						→　データベースユーザー
+		DBPASSWORD=passwordxxx						→　データベースパスワード
+		DBNAME_OHR=ohr						→　データベース名（ohr）
+		DBNAME_TENANT=tenant						→　データベース名（tenant）
+		DBSERVER=localhost						→　データベースIP
+		PORT=5432  						→　データベースポート
+		POSTGRE_PATH=E:\Program Files\PostgreSQL\16\bin						→　postgresインストールフォルダのbinパスに設定
+		SAVE_DAYS=30						→　バックアップのDMP保存時間(単位:日)
+	③　windowsタスクスケジューラを追加							
+		タスク作成（ohr、tenantが別々で作成）						
+		トリガー追加						
+			OK					
+		操作設定						
+		OK押下、サーバーパスワード設定で、タスク作成完了						
+		一回実行で、検証する						
+		右クリックで、実行するをクリックする						
+		正しく動くすれば、backupフォルダにdumpファイルを作成します。						

@@ -31,64 +31,66 @@ OHR_Installer/
 ## 3. 环境与参数定义 (Environment & Parameters)
 
 ### 3.1 识别信息收集 (Environment Collection)
-- **客户名称 (CustomerName)**:
-    - **逻辑**: 主菜单第一级。由于客户较多，需先选择已有客户或输入 [新客户]。
-- **环境名称 (EnvName)**:
-    - **逻辑**: 主菜单第二级。选择客户后，列出该客户下的环境（如：社内验证、DEMO、开发、本番）或输入 [新环境]。
-- **路径隔离映射**:
-    - 日志: `logs/{{CustomerName}}/{{EnvName}}/`
-    - 安装包: `installer/{{CustomerName}}/{{EnvName}}/`
-    - 历史配置: `config/history/snapshot.json` (或 `config/history/{{CustomerName}}.json`，内部通过 JSON 结构区分环境)
-    - 备份: `backup/{{CustomerName}}/{{EnvName}}/`
+- **客户与环境标识**: `CustomerName` / `EnvName` (主菜单引导)。
+- **主机与网络信息**: 
+    - `APHostIP`: 用于注入 Tenant URL (如 `192.168.10.208`)。
+    - `APHostName`: 用于资源调度分配识别 (如 `HOKUSEN-HR-AP`)。
+    - `APPort`: 默认 `7070`。
+- **数据库连接 (PostgreSQL)**:
+    - `DBHostIP`, `DBPort`, `DBUser`, `DBPassword`。
+    - `PostgresBinPath`: 用于执行 `psql` / `createdb` 指令。
+- **中间件与存储 (MinIO)**:
+    - `MinioEndpoint`, `MinioAccessKey`, `MinioSecretKey`, `BucketName` (默认: ohr)。
+- **硬件资源配额**:
+    - `CPU Cores` (默认: 4), `RAM Total MB` (默认: 8192)。
 
-### 3.2 资材路径配置
+### 3.2 资产路径配置 (Path Configuration)
 - **原始资材路径 (ArtifactsPath)**: 用户提供的、未经配置的 OHR 编译包根目录。
-- **配置后保存路径 (ConfiguredArtifactsPath)**: 脚本完成参数注入（配置化）后的资材存放位置。
-    - **隔离逻辑**: 为防止不同客户或环境间的覆盖，必须按二级逻辑存储：`$ConfiguredArtifactsPath/{{CustomerName}}/{{EnvName}}/`。
-    - **产出内容**: 包含专属于该客户环境的配置文件、.bat 脚本及安装包。
+- **配置后保存路径 (ConfiguredArtifactsPath)**: `$ConfiguredArtifactsPath/{{CustomerName}}/{{EnvName}}/`。
+    - **隔离逻辑**: 该目录下存放 Phase A 生成的、专属于当前环境的配置文件及 **动态修正 SQL**。
 
 ### 3.3 参数示例
 ```powershell
 ./Install-OHR.ps1 `
     -CustomerName "Hokusen-Group" `
     -EnvName "Production-Primary" `
+    -APHostIP "192.168.10.208" `
+    -APHostName "HOKUSEN-HR-AP" `
     -ArtifactsPath "D:\Source\OHR_Release" `
-    -ConfiguredArtifactsPath "D:\Configured\OHR" `
-    -APHostName "AP-SRV-01" `
-    -IsDBLocal $false `
     -DBCredential (Get-Credential)
 ```
 
 ## 4. 执行流程与关键逻辑 (Execution Logic)
 
 ### 4.1 Phase A: 配置安装环境 (Environmental Configuration)
-本阶段负责通过交互式菜单或参数收集客户现场信息，并生成离线可执行的安装子集。
+本阶段的核心是 **“消除硬编码”**，将手顺书中的静态 IP/主机名转化为可由脚本动态注入的参数。
 
-1. **初始化校验**:
-    - 运行权限提升 (Admin Required)。
-    - PowerShell 7.0+ 检查。
-    - 原始资材目录 (`ArtifactsPath`) 完整性检查。
-2. **环境采集与备份**: 
-    - 两阶段交互导航（客户/环境选择）。
-    - 从历史 JSON 读取默认值。
-    - **执行业务检查**：若目标 `installer/{{CustomerName}}/{{EnvName}}/` 已有资材，执行移动备份（见 6.3 节）。
-3. **配置注入与打包 (Configurator)**:
-    - 将 `config.template/` 中的所有模板文件复制到 `work/`。
-    - 根据参数执行变量替换（DB 连接, MinIO Endpoint 等）。
-    - 将生成的配置及完整安装包移动至 `ConfiguredArtifactsPath/{{CustomerName}}/{{EnvName}}`。
+1. **环境采集与历史加载**: 采用两阶段菜单，通过 `config/history/` 加载上次执行的默认值。
+2. **安全冲突检查与备份 (见 6.3 节)**: 检查 `installer/` 目录，若有旧版，则平移备份至 `backup/`。
+3. **参数注入逻辑 (Configurator)**:
+    - **文件变量替换**: 更新 `config.template/` 下的所有 `.json`, `.yml`, `.properties` 模板。
+    - **动态 SQL 生成**: 根据 `APHostIP` 和 `APPort` 动态生成用于更新 `tenant` 数据库的 SQL (即 `UPDATE tenant SET url = ...` 及 `INSERT INTO async_task_resource_distribution ...`)。
+4. **离线包封装**: 将配置好的所有文件、脚本及编译后的安装包完整复制至 `installer/{{CustomerName}}/{{EnvName}}/`。
 
 ### 4.2 Phase B: 执行部署安装 (Installation Execution)
-本阶段基于已生成的安装包，对目标服务器执行物理部署。
+基于 Phase A 产出的资材，执行符合《环境安装手顺书》顺序的全流程部署。
 
-1. **数据库预埋**:
-    - 修改 `pg_hba.conf` 并测试联调。
-    - 初始化数据库（tenant 与 ohr）并执行 SQL 数据导入。
-2. **应用部署服务**:
-    - 获取配置后的资材路径。
-    - 执行 `suite.install.ps1` 完成 Windows 服务注册及挂载。
-3. **最终启动与验收**:
-    - 启动服务 (`suite.start.ps1`) 并校验状态。
-    - 执行 HTTP 级别可用性检查，生成结果测试报告。
+1. **数据库准备与初始化**:
+    - 配置 PostgreSQL `pg_hba.conf` 并重启服务。
+    - 在本地或远程（WinRM）创建 `tenant` 与 `ohr` 数据库。
+2. **Tenant 数据导入 (关键手顺映射)**:
+    - 依次从 `sql/1.tenant/` 路径导入：`i18n_svc_message.sql`, `i18n_web_message.sql`, `url_info.sql`, `ohr_help.sql`。
+    - 执行 Phase A 生成的 **IP 与资源配额修正 SQL**。
+3. **服务注册与启动**:
+    - 执行 `allow.execute.ps1.script.bat`（管理员权限提升）。
+    - 执行 `suite.install.ps1`（输入 "y" 自动确认）。
+    - 执行 `suite.start.ps1`（由于配置已注入，无需人工干预）。
+4. **业务数据 (OHR) 与中间件配置**:
+    - 依次从 `sql/2.ohr/` 路径导入：`ds-create`, `code`, `scheduled_task`, `account`, `ohr.sql`。
+    - **MinIO 配置**: 自动创建 Bucket 条目（参考 F1 手顺）。
+    - **计划任务**: 执行 `win-create-task-job.bat` 以实现 Windows 自启动。
+5. **综合验收**:
+    - 模拟 HTTP 总领口请求 (`7070`)，生成最终的 `reports/` 数据文件。
 
 ## 5. 日志与报告要求 (Logs & Reports)
 

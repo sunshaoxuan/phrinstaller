@@ -1,0 +1,38 @@
+	１．	インストールファイルを任意位置にコピーまた解凍する																							
+	２．インストール配置ファイルの内容を確認する																							
+		※ディフォルト値のまま、不要です。																						
+	３．「allow.execute.ps1.script.bat」スクリプトファイルを右クリックし、「管理者として実行」をクリックする																							
+	４．「suite.install.ps1」スクリプトファイルを右クリックし、「PowerShellで実行」をクリックする																							
+		■	”y”を入力して、インストール処理を実行する																						
+		■	インストールが完了したら、Enterキーを押下するとウインドウを閉じる																						
+	５．「suite.start.ps1」スクリプトファイルを右クリックし、「PowerShellで実行」をクリックする																							
+		■	”y”を入力して、すべてサービスを起動する																						
+		■	起動が完了したら、Enterキーを押下するとウインドウを閉じる																						
+	6．■ストレージバケットの作成を実施してください。																							
+		シート「F１．MINIOを配置する」を参照ください。																						
+	7．■Tenant情報を導入SQL文を実施してください。																							
+		■Tenant情報を導入SQL文を実施してください。																						
+		※データベス「tenant」																						
+		（１）国際化情報																						
+			パス：「..\1.tenant\i18n_svc_message.sql」ファイルを実施してください。																					
+			パス：「..\1.tenant\i18n_web_message.sql」ファイルを実施してください。																					
+			パス：「..\1.tenant\url_info.sql」ファイルを実施してください。																					
+			パス：「..\1.tenant\ohr_help.sql」ファイルを実施してください。																					
+		（２）Tenant情報																						
+			↓SQLを実施してください。																					
+			UPDATE tenant																					
+			SET url='http://192.168.10.208:7070',																					
+			system_config= jsonb_set(system_config ::jsonb, '{shainnoLength}', '"8"')																					
+			WHERE tenant_id='public';																					
+			UPDATE tenant SET system_config= jsonb_set(system_config ::jsonb, '{enableEmail}', 'false')																					
+			WHERE tenant_id='public';																					
+			UPDATE tenant SET system_config= jsonb_set(system_config ::jsonb, '{enableTransportSetting}', 'false')																					
+			WHERE tenant_id='public';																					
+			UPDATE tenant SET system_config= jsonb_set(system_config ::jsonb, '{enableLecture}', 'true')																					
+			WHERE tenant_id='public';																					
+			UPDATE tenant SET support_applications = '{em,mdm,personal-portal,taxadjustment}'																					
+			WHERE tenant_id='public';																					
+			INSERT INTO async_task_resource_distribution																					
+			(cpu_cores, ram, host_address)																					
+			VALUES(4, 8192, 'HOKUSEN-HR-AP');																					
+	7．Windows起動時に自動的に起動するように設定する場合は、「win-create-task-job.bat」スクリプトファイルを右クリックし、「管理者として実行」をクリックする																							

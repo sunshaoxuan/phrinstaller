@@ -1,0 +1,4 @@
+	下記URLでMINIOのコンソールをログイン	
+		http://127.0.0.1:9001/login
+		admin/SopLR4BTVw
+	すべてチェック、保存	
